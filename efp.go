@@ -12,57 +12,60 @@ import (
 )
 
 // QuoteDouble, QuoteSingle and other's constants are token definitions.
+
 const (
 	// Character constants
-	QuoteDouble  = "\""
-	QuoteSingle  = "'"
-	BracketClose = "]"
-	BracketOpen  = "["
-	BraceOpen    = "{"
-	BraceClose   = "}"
-	ParenOpen    = "("
-	ParenClose   = ")"
-	Semicolon    = ";"
-	Whitespace   = " "
-	Comma        = ","
-	ErrorStart   = "#"
+
+	QuoteDouble  = "\"" //双引号
+	QuoteSingle  = "'"  //单引号
+	BracketClose = "]"  //右中括号
+	BracketOpen  = "["  //左中括号
+	BraceOpen    = "{"  //左大括号
+	BraceClose   = "}"  //右大括号
+	ParenOpen    = "("  //左括号
+	ParenClose   = ")"  //右括号
+	Semicolon    = ";"  //分号
+	Whitespace   = " "  //空格
+	Comma        = ","  //逗号
+	ErrorStart   = "#"  //错误信息开始
 
 	OperatorsSN      = "+-"
-	OperatorsInfix   = "+-*/^&=><"
-	OperatorsPostfix = "%"
+	OperatorsInfix   = "+-*/^&=><" //操作符中缀
+	OperatorsPostfix = "%"         //操作符后缀
 
 	// Token type
-	TokenTypeNoop            = "Noop"
-	TokenTypeOperand         = "Operand"
-	TokenTypeFunction        = "Function"
-	TokenTypeSubexpression   = "Subexpression"
-	TokenTypeArgument        = "Argument"
-	TokenTypeOperatorPrefix  = "OperatorPrefix"
-	TokenTypeOperatorInfix   = "OperatorInfix"
-	TokenTypeOperatorPostfix = "OperatorPostfix"
-	TokenTypeWhitespace      = "Whitespace"
-	TokenTypeUnknown         = "Unknown"
+	TokenTypeNoop            = "Noop"            //类型:无操作
+	TokenTypeOperand         = "Operand"         //类型:操作数
+	TokenTypeFunction        = "Function"        //类型:函数
+	TokenTypeSubexpression   = "Subexpression"   //类型:子表达式
+	TokenTypeArgument        = "Argument"        //类型:论点
+	TokenTypeOperatorPrefix  = "OperatorPrefix"  //类型:操作符前缀
+	TokenTypeOperatorInfix   = "OperatorInfix"   //类型:操作符中缀
+	TokenTypeOperatorPostfix = "OperatorPostfix" //类型:操作符后缀
+	TokenTypeWhitespace      = "Whitespace"      //类型:空白
+	TokenTypeUnknown         = "Unknown"         //类型:未知
 
 	// Token subtypes
-	TokenSubTypeNothing       = "Nothing"
-	TokenSubTypeStart         = "Start"
-	TokenSubTypeStop          = "Stop"
-	TokenSubTypeText          = "Text"
-	TokenSubTypeNumber        = "Number"
-	TokenSubTypeLogical       = "Logical"
-	TokenSubTypeError         = "Error"
-	TokenSubTypeRange         = "Range"
-	TokenSubTypeMath          = "Math"
-	TokenSubTypeConcatenation = "Concatenation"
-	TokenSubTypeIntersection  = "Intersection"
-	TokenSubTypeUnion         = "Union"
+	TokenSubTypeNothing       = "Nothing"       //子类型:无
+	TokenSubTypeStart         = "Start"         //子类型:开始
+	TokenSubTypeStop          = "Stop"          //子类型:结束
+	TokenSubTypeText          = "Text"          //子类型:文字
+	TokenSubTypeNumber        = "Number"        //子类型:数字
+	TokenSubTypeLogical       = "Logical"       //子类型:逻辑
+	TokenSubTypeError         = "Error"         //子类型:错误
+	TokenSubTypeRange         = "Range"         //子类型:范围
+	TokenSubTypeMath          = "Math"          //子类型:数学
+	TokenSubTypeConcatenation = "Concatenation" //子类型:连接符
+	TokenSubTypeIntersection  = "Intersection"  //子类型:交集
+	TokenSubTypeUnion         = "Union"         //子类型:联合
 )
 
 // Token encapsulate a formula token.
+//公式标记
 type Token struct {
-	TValue   string
-	TType    string
-	TSubType string
+	TValue   string //标记的值
+	TType    string //标记的类型
+	TSubType string //标记的子类型
 }
 
 // Tokens directly maps the ordered list of tokens.
@@ -71,19 +74,21 @@ type Token struct {
 //    items - Ordered list
 //    index - Current position in the list
 //
+//标记堆栈
 type Tokens struct {
-	Index int
-	Items []Token
+	Index int     //堆栈索引
+	Items []Token //标记堆栈
 }
 
 // Parser inheritable container. TokenStack directly maps a LIFO stack of
 // tokens.
+// 解析器容器,标记栈直接映射成一个后进先出的栈
 type Parser struct {
-	Formula    string
-	Tokens     Tokens
-	TokenStack Tokens
-	Offset     int
-	Token      string
+	Formula    string //公式的字符串
+	Tokens     Tokens //最终的标记堆栈
+	TokenStack Tokens //临时的标记堆栈
+	Offset     int    //当前位置
+	Token      string //当前的标记字符串
 	InString   bool
 	InPath     bool
 	InRange    bool
@@ -91,6 +96,7 @@ type Parser struct {
 }
 
 // fToken provides function to encapsulate a formula token.
+//标记封装函数
 func fToken(value, tokenType, subType string) Token {
 	return Token{
 		TValue:   value,
@@ -100,6 +106,7 @@ func fToken(value, tokenType, subType string) Token {
 }
 
 // fTokens provides function to handle an ordered list of tokens.
+//初始化生成一个标记堆栈
 func fTokens() Tokens {
 	return Tokens{
 		Index: -1,
@@ -107,6 +114,7 @@ func fTokens() Tokens {
 }
 
 // add provides function to add a token to the end of the list.
+//往标记堆栈末尾添加一个新标记
 func (tk *Tokens) add(value, tokenType, subType string) Token {
 	token := fToken(value, tokenType, subType)
 	tk.addRef(token)
@@ -114,26 +122,31 @@ func (tk *Tokens) add(value, tokenType, subType string) Token {
 }
 
 // addRef provides function to add a token to the end of the list.
+//往标记堆栈末尾添加一个新标记
 func (tk *Tokens) addRef(token Token) {
 	tk.Items = append(tk.Items, token)
 }
 
 // reset provides function to reset the index to -1.
+// 重置标记堆栈的索引为-1
 func (tk *Tokens) reset() {
 	tk.Index = -1
 }
 
 // BOF provides function to check whether or not beginning of list.
+// 判断标记集所以是否已经到起始位置了
 func (tk *Tokens) BOF() bool {
 	return tk.Index <= 0
 }
 
 // EOF provides function to check whether or not end of list.
+// 判断标记集索引是否已经到结束位置了
 func (tk *Tokens) EOF() bool {
 	return tk.Index >= (len(tk.Items) - 1)
 }
 
 // moveNext provides function to move the index along one.
+// 标记集索引增加1
 func (tk *Tokens) moveNext() bool {
 	if tk.EOF() {
 		return false
@@ -143,6 +156,7 @@ func (tk *Tokens) moveNext() bool {
 }
 
 // current return the current token.
+// 返回标记集索引所在位置的标记指针
 func (tk *Tokens) current() *Token {
 	if tk.Index == -1 {
 		return nil
@@ -151,6 +165,7 @@ func (tk *Tokens) current() *Token {
 }
 
 // next return the next token (leave the index unchanged).
+// 返回标记集索引所在位置下一个位置的标记指针，保持索引不变
 func (tk *Tokens) next() *Token {
 	if tk.EOF() {
 		return nil
@@ -159,6 +174,7 @@ func (tk *Tokens) next() *Token {
 }
 
 // previous return the previous token (leave the index unchanged).
+// 返回标记集索引所在位置上一个位置的标记指针, 保持索引不变
 func (tk *Tokens) previous() *Token {
 	if tk.Index < 1 {
 		return nil
@@ -167,11 +183,13 @@ func (tk *Tokens) previous() *Token {
 }
 
 // push provides function to push a token onto the stack.
+// 往标记集中正压入一个标记
 func (tk *Tokens) push(token Token) {
 	tk.Items = append(tk.Items, token)
 }
 
 // pop provides function to pop a token off the stack.
+// 从堆栈中弹出标记，给出标记结束符
 func (tk *Tokens) pop() Token {
 	if len(tk.Items) == 0 {
 		return Token{
@@ -186,6 +204,7 @@ func (tk *Tokens) pop() Token {
 
 // token provides function to non-destructively return the top item on the
 // stack.
+// 从标记堆栈中返回最后一个标记指针
 func (tk *Tokens) token() *Token {
 	if len(tk.Items) > 0 {
 		return &tk.Items[len(tk.Items)-1]
@@ -194,6 +213,7 @@ func (tk *Tokens) token() *Token {
 }
 
 // value return the top token's value.
+// 返回标记堆栈中最后一个标记的值
 func (tk *Tokens) value() string {
 	if tk.token() == nil {
 		return ""
@@ -202,6 +222,7 @@ func (tk *Tokens) value() string {
 }
 
 // tp return the top token's type.
+// 返回标记堆栈中最后一个标记的类型
 func (tk *Tokens) tp() string {
 	if tk.token() == nil {
 		return ""
@@ -210,6 +231,7 @@ func (tk *Tokens) tp() string {
 }
 
 // subtype return the top token's subtype.
+// 返回标记堆栈中最后一个标记的子类型
 func (tk *Tokens) subtype() string {
 	if tk.token() == nil {
 		return ""
@@ -219,91 +241,95 @@ func (tk *Tokens) subtype() string {
 
 // ExcelParser provides function to parse an Excel formula into a stream of
 // tokens.
+// 构建一个EXCEL公式解析器容器
 func ExcelParser() Parser {
 	return Parser{}
 }
 
 // getTokens return a token stream (list).
+// 从公式字符串中获取标记堆栈
 func (ps *Parser) getTokens(formula string) Tokens {
-	ps.Formula = strings.TrimSpace(ps.Formula)
+	ps.Formula = strings.TrimSpace(ps.Formula) //剔除公式中所有的空格
 	f := []rune(ps.Formula)
 	if len(f) > 0 {
-		if string(f[0]) != "=" {
-			ps.Formula = "=" + ps.Formula
+		if string(f[0]) != "=" { //检查公式的第一个字符是否为等号
+			ps.Formula = "=" + ps.Formula //不是就加上
 		}
 	}
 
 	// state-dependent character evaluation (order is important)
-	for !ps.EOF() {
+	for !ps.EOF() { //尚未到最后一个字符
 
-		// double-quoted strings
-		// embeds are doubled
-		// end marks token
-		if ps.InString {
-			if ps.currentChar() == "\"" {
-				if ps.nextChar() == "\"" {
-					ps.Token += "\""
-					ps.Offset++
-				} else {
-					ps.InString = false
-					ps.Tokens.add(ps.Token, TokenTypeOperand, TokenSubTypeText)
-					ps.Token = ""
+		// double-quoted strings,双引号字符串
+		// embeds are doubled,嵌入在两个引号中
+		// end marks token,第二个引号就意味着一个新标记
+		if ps.InString { //如果当前位置在一个字符串中
+			if ps.currentChar() == "\"" { //当前字符为双引号
+				if ps.nextChar() == "\"" { //下一个字符为双引号
+					ps.Token += "\"" //标记字符串添加上双引号
+					ps.Offset++      //标记位置后移一位
+				} else { //下一个字符不是双引号
+					ps.InString = false                                         //字符串结束了
+					ps.Tokens.add(ps.Token, TokenTypeOperand, TokenSubTypeText) //添加一个类型为操作数,子类型为字符串的标记
+					ps.Token = ""                                               //当前标记清空
 				}
-			} else {
-				ps.Token += ps.currentChar()
+			} else { //如果当前标记不是双引号
+				ps.Token += ps.currentChar() //添加当前字符到标记字符串中
 			}
-			ps.Offset++
-			continue
+			ps.Offset++ //标记位置后移一位
+			continue    //继续循环
 		}
 
-		// single-quoted strings (links)
-		// embeds are double
+		// single-quoted strings (links),单引号字符串(连接)
+		// embeds are double,嵌入在两个引号中
 		// end does not mark a token
-		if ps.InPath {
-			if ps.currentChar() == "'" {
-				if ps.nextChar() == "'" {
-					ps.Token += "'"
-					ps.Offset++
-				} else {
+		if ps.InPath { //是路径
+			if ps.currentChar() == "'" { //当前字符串是一个单引号
+				if ps.nextChar() == "'" { //下一个字符串也是一个单引号
+					ps.Token += "'" //标记字符串加上这个单引号
+					ps.Offset++     //标记位置后移一位
+				} else { //下一个位置不是单引号
 					ps.InPath = false
 				}
 			} else {
 				ps.Token += ps.currentChar()
 			}
 			ps.Offset++
-			continue
+			continue //继续循环
 		}
 
 		// bracketed strings (range offset or linked workbook name)
 		// no embeds (changed to "()" by Excel)
 		// end does not mark a token
-		if ps.InRange {
-			if ps.currentChar() == "]" {
-				ps.InRange = false
+		if ps.InRange { //在双引号之中
+			if ps.currentChar() == "]" { //当前字符是右双引号
+				ps.InRange = false //双引号结束
 			}
-			ps.Token += ps.currentChar()
-			ps.Offset++
-			continue
+			ps.Token += ps.currentChar() //标记中添加上当前字符
+			ps.Offset++                  //标记位置后移一位
+			continue                     //继续循环
 		}
 
 		// error values
 		// end marks a token, determined from absolute list of values
-		if ps.InError {
+		if ps.InError { //在错误标记中
 			ps.Token += ps.currentChar()
 			ps.Offset++
+			//如果当前标记是错误标记中的一个
 			if inStrSlice([]string{",#NULL!,", ",#DIV/0!,", ",#VALUE!,", ",#REF!,", ",#NAME?,", ",#NUM!,", ",#N/A,"}, ","+ps.Token+",") != -1 {
-				ps.InError = false
-				ps.Tokens.add(ps.Token, TokenTypeOperand, TokenSubTypeError)
+				ps.InError = false                                           //错误标记结束
+				ps.Tokens.add(ps.Token, TokenTypeOperand, TokenSubTypeError) //添加一个操作数错误标记
 				ps.Token = ""
 			}
 			continue
 		}
 
-		// scientific notation check
+		// scientific notation check//科学计数法检查
+		//当前字符为加号或者减号,并且当前标记的长度已经大于1
 		if strings.ContainsAny(ps.currentChar(), "+-") && len(ps.Token) > 1 {
 			r, _ := regexp.Compile(`^[1-9]{1}(\.[0-9]+)?E{1}$`)
-			if r.MatchString(ps.Token) {
-				ps.Token += ps.currentChar()
+			if r.MatchString(ps.Token) { //当前标记符合科学计数法的正则
+				ps.Token += ps.currentChar() //添加上当前标记
 				ps.Offset++
 				continue
 			}
@@ -311,13 +337,13 @@ func (ps *Parser) getTokens(formula string) Tokens {
 
 		// independent character evaluation (order not important)
 		// establish state-dependent character evaluations
-		if ps.currentChar() == "\"" {
-			if len(ps.Token) > 0 {
+		if ps.currentChar() == "\"" { //当前字符串为双引号
+			if len(ps.Token) > 0 { //如果标记已经大于0
 				// not expected
-				ps.Tokens.add(ps.Token, TokenTypeUnknown, "")
-				ps.Token = ""
+				ps.Tokens.add(ps.Token, TokenTypeUnknown, "") //未知标记
+				ps.Token = ""                                 //结束当前标记
 			}
-			ps.InString = true
+			ps.InString = true //开始在字符串中标记
 			ps.Offset++
 			continue
 		}
@@ -585,19 +611,24 @@ func (ps *Parser) getTokens(formula string) Tokens {
 
 // doubleChar provides function to get two characters after the current
 // position.
+// 返回公式中相对于偏移量的最后两个字符,如果没有比偏移量大2个值的索引了,返回空字符串
 func (ps *Parser) doubleChar() string {
+	//将公式转换为字符值数组,并检验其长度是否比偏移量至少大于2
 	if len([]rune(ps.Formula)) >= ps.Offset+2 {
+		//返回最后两个字符
 		return string([]rune(ps.Formula)[ps.Offset : ps.Offset+2])
 	}
 	return ""
 }
 
 // currentChar provides function to get the character of the current position.
+// 返回当前位置(偏移量)相对的当前字符
 func (ps *Parser) currentChar() string {
 	return string([]rune(ps.Formula)[ps.Offset])
 }
 
 // nextChar provides function to get the next character of the current position.
+// 返回当前位置(偏移量相对应)下一个字符
 func (ps *Parser) nextChar() string {
 	if len([]rune(ps.Formula)) >= ps.Offset+2 {
 		return string([]rune(ps.Formula)[ps.Offset+1 : ps.Offset+2])
@@ -606,11 +637,13 @@ func (ps *Parser) nextChar() string {
 }
 
 // EOF provides function to check whether or not end of tokens stack.
+// 判断是否最后一个字符
 func (ps *Parser) EOF() bool {
 	return ps.Offset >= len([]rune(ps.Formula))
 }
 
 // Parse provides function to parse formula as a token stream (list).
+// 解析公式字符串
 func (ps *Parser) Parse(formula string) []Token {
 	ps.Formula = formula
 	ps.Tokens = ps.getTokens(formula)
@@ -619,6 +652,7 @@ func (ps *Parser) Parse(formula string) []Token {
 
 // PrettyPrint provides function to pretty the parsed result with the indented
 // format.
+// 以缩进格式打印解析结果
 func (ps *Parser) PrettyPrint() string {
 	indent := 0
 	output := ""
@@ -638,6 +672,7 @@ func (ps *Parser) PrettyPrint() string {
 }
 
 // Render provides function to get formatted formula after parsed.
+// 解析好后格式化的公式
 func (ps *Parser) Render() string {
 	output := ""
 	for _, t := range ps.Tokens.Items {
@@ -662,6 +697,7 @@ func (ps *Parser) Render() string {
 
 // inStrSlice provides a method to check if an element is present in an array,
 // and return the index of its location, otherwise return -1.
+// 检查一个字符元素在字符串中是否存在,存在就返回它第一次出现的位置,不存在就返回-1
 func inStrSlice(a []string, x string) int {
 	for idx, n := range a {
 		if x == n {
