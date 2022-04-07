@@ -128,14 +128,14 @@ func TestRune(t *testing.T) {
 
 func TestContainsAny(t *testing.T) {
 	formulae := []string{
-		`1`,
-		`a`,
+		`>`,
+		`<=`,
 		`+`,
-		`-`,
+		`=b`,
 	}
 	for _, f := range formulae {
 		t.Log("----------------------------------------------------------------")
 		t.Log(f)
-		t.Log(strings.ContainsAny(f, "+-"))
+		t.Log(strings.ContainsAny(f, "<>="))
 	}
 }

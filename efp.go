@@ -147,6 +147,7 @@ func (tk *Tokens) EOF() bool {
 
 // moveNext provides function to move the index along one.
 // 标记集索引增加1
+// 如果已经到尾部了，返回false，否则返回true
 func (tk *Tokens) moveNext() bool {
 	if tk.EOF() {
 		return false
@@ -189,7 +190,7 @@ func (tk *Tokens) push(token Token) {
 }
 
 // pop provides function to pop a token off the stack.
-// 从堆栈中弹出标记，给出标记结束符
+// 从堆栈中弹出标记，给出子标记结束符
 func (tk *Tokens) pop() Token {
 	if len(tk.Items) == 0 {
 		return Token{
@@ -337,8 +338,8 @@ func (ps *Parser) getTokens(formula string) Tokens {
 
 		// independent character evaluation (order not important)
 		// establish state-dependent character evaluations
-		if ps.currentChar() == "\"" { //当前字符串为双引号
-			if len(ps.Token) > 0 { //如果标记已经大于0
+		if ps.currentChar() == "\"" { //当前字符为双引号
+			if len(ps.Token) > 0 { //如果标记长度已经大于0
 				// not expected
 				ps.Tokens.add(ps.Token, TokenTypeUnknown, "") //未知标记
 				ps.Token = ""                                 //结束当前标记
@@ -348,62 +349,64 @@ func (ps *Parser) getTokens(formula string) Tokens {
 			continue
 		}
 
-		if ps.currentChar() == "'" {
-			if len(ps.Token) > 0 {
+		if ps.currentChar() == "'" { //当前字符为单引号
+			if len(ps.Token) > 0 { //如果标记长度已经大于0
 				// not expected
-				ps.Tokens.add(ps.Token, TokenTypeUnknown, "")
+				ps.Tokens.add(ps.Token, TokenTypeUnknown, "") //未知标记
 				ps.Token = ""
 			}
-			ps.InPath = true
+			ps.InPath = true //开启路径
 			ps.Offset++
 			continue
 		}
 
-		if ps.currentChar() == "[" {
-			ps.InRange = true
+		if ps.currentChar() == "[" { //当前字符为左中括号
+			ps.InRange = true //开启范围
 			ps.Token += ps.currentChar()
 			ps.Offset++
 			continue
 		}
 
-		if ps.currentChar() == "#" {
+		if ps.currentChar() == "#" { //当前字符为井号
 			if len(ps.Token) > 0 {
 				// not expected
 				ps.Tokens.add(ps.Token, TokenTypeUnknown, "")
 				ps.Token = ""
 			}
-			ps.InError = true
+			ps.InError = true //开启错误标记
 			ps.Token += ps.currentChar()
 			ps.Offset++
 			continue
 		}
 
 		// mark start and end of arrays and array rows
-		if ps.currentChar() == "{" {
+		if ps.currentChar() == "{" { //当前字符为左大括号
 			if len(ps.Token) > 0 {
 				// not expected
 				ps.Tokens.add(ps.Token, TokenTypeUnknown, "")
 				ps.Token = ""
 			}
+			//开始数组和数组的行
 			ps.TokenStack.push(ps.Tokens.add("ARRAY", TokenTypeFunction, TokenSubTypeStart))
 			ps.TokenStack.push(ps.Tokens.add("ARRAYROW", TokenTypeFunction, TokenSubTypeStart))
 			ps.Offset++
 			continue
 		}
 
-		if ps.currentChar() == ";" {
+		if ps.currentChar() == ";" { //当前字符为分号
 			if len(ps.Token) > 0 {
-				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
+				ps.Tokens.add(ps.Token, TokenTypeOperand, "") //结束现有操作符标记,但不设置子标记类型
 				ps.Token = ""
 			}
-			ps.Tokens.addRef(ps.TokenStack.pop())
+			ps.Tokens.addRef(ps.TokenStack.pop()) //子标记结束标记
 			ps.Tokens.add(",", TokenTypeArgument, "")
+			//下一个子标记开始
 			ps.TokenStack.push(ps.Tokens.add("ARRAYROW", TokenTypeFunction, TokenSubTypeStart))
 			ps.Offset++
 			continue
 		}
 
-		if ps.currentChar() == "}" {
+		if ps.currentChar() == "}" { //当前字符为右大括号
 			if len(ps.Token) > 0 {
 				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
 				ps.Token = ""
@@ -415,42 +418,45 @@ func (ps *Parser) getTokens(formula string) Tokens {
 		}
 
 		// trim white-space
-		if ps.currentChar() == " " {
+		if ps.currentChar() == " " { //当前标记为空格
 			if len(ps.Token) > 0 {
-				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
+				ps.Tokens.add(ps.Token, TokenTypeOperand, "") //结束一个标记
 				ps.Token = ""
 			}
-			ps.Tokens.add("", TokenTypeWhitespace, "")
+			ps.Tokens.add("", TokenTypeWhitespace, "") //添加一个空格标记
 			ps.Offset++
-			for (ps.currentChar() == " ") && (!ps.EOF()) {
+			for (ps.currentChar() == " ") && (!ps.EOF()) { //过滤掉多余的空格
 				ps.Offset++
 			}
 			continue
 		}
 
 		// multi-character comparators
+		//如果紧后的两个字符为比价操作符
 		if inStrSlice([]string{",>=,", ",<=,", ",<>,"}, ","+ps.doubleChar()+",") != -1 {
 			if len(ps.Token) > 0 {
-				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
+				ps.Tokens.add(ps.Token, TokenTypeOperand, "") //结束当前操作数
 				ps.Token = ""
 			}
-			ps.Tokens.add(ps.doubleChar(), TokenTypeOperatorInfix, TokenSubTypeLogical)
+			ps.Tokens.add(ps.doubleChar(), TokenTypeOperatorInfix, TokenSubTypeLogical) //添加为比较操作符
 			ps.Offset += 2
 			continue
 		}
 
 		// standard infix operators
+		//如果当前字符为运算符
 		if strings.ContainsAny("+-*/^&=><", ps.currentChar()) {
 			if len(ps.Token) > 0 {
 				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
 				ps.Token = ""
 			}
-			ps.Tokens.add(ps.currentChar(), TokenTypeOperatorInfix, "")
+			ps.Tokens.add(ps.currentChar(), TokenTypeOperatorInfix, "") //中缀操作符
 			ps.Offset++
 			continue
 		}
 
 		// standard postfix operators
+		//后缀操作符
 		if ps.currentChar() == "%" {
 			if len(ps.Token) > 0 {
 				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
@@ -462,6 +468,7 @@ func (ps *Parser) getTokens(formula string) Tokens {
 		}
 
 		// start subexpression or function
+		// 子表达式
 		if ps.currentChar() == "(" {
 			if len(ps.Token) > 0 {
 				ps.TokenStack.push(ps.Tokens.add(ps.Token, TokenTypeFunction, TokenSubTypeStart))
@@ -474,9 +481,10 @@ func (ps *Parser) getTokens(formula string) Tokens {
 		}
 
 		// function, subexpression, array parameters
+		// 函数、子表达式、数组的参数
 		if ps.currentChar() == "," {
 			if len(ps.Token) > 0 {
-				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
+				ps.Tokens.add(ps.Token, TokenTypeOperand, "") //逗号前的是操作数
 				ps.Token = ""
 			}
 			if ps.TokenStack.tp() != TokenTypeFunction {
@@ -489,6 +497,7 @@ func (ps *Parser) getTokens(formula string) Tokens {
 		}
 
 		// stop subexpression
+		// 当前字符是右括号
 		if ps.currentChar() == ")" {
 			if len(ps.Token) > 0 {
 				ps.Tokens.add(ps.Token, TokenTypeOperand, "")
@@ -505,6 +514,7 @@ func (ps *Parser) getTokens(formula string) Tokens {
 	}
 
 	// dump remaining accumulation
+	// 把剩余标记作为操作数
 	if len(ps.Token) > 0 {
 		ps.Tokens.add(ps.Token, TokenTypeOperand, "")
 	}
@@ -515,9 +525,14 @@ func (ps *Parser) getTokens(formula string) Tokens {
 	for ps.Tokens.moveNext() {
 		token := ps.Tokens.current()
 
-		if token.TType == TokenTypeWhitespace {
-			if ps.Tokens.BOF() || ps.Tokens.EOF() {
-			} else if !(((ps.Tokens.previous().TType == TokenTypeFunction) && (ps.Tokens.previous().TSubType == TokenSubTypeStop)) || ((ps.Tokens.previous().TType == TokenTypeSubexpression) && (ps.Tokens.previous().TSubType == TokenSubTypeStop)) || (ps.Tokens.previous().TType == TokenTypeOperand)) {
+		// 先判断当前标记是否为空格,如果是空格
+		// 在判断是否处于堆栈的开始或者结束位置,
+		// 如果不是,再判断前一个标记是否 标记类型为函数,且子类型为结束符 或者 类型为子表达式且子类型为结束符 或者 类型为操作数
+		// 如果是,再判断后一个标记是否 标记类型为函数,且子类型为结束符 或者 类型为子表达式且子类型为结束符 或者 类型为操作数
+		// 如果是,添加一个操作符中缀
+		if token.TType == TokenTypeWhitespace { //如果标记的类型为空格
+			if ps.Tokens.BOF() || ps.Tokens.EOF() { //如果是标记的开始和结束,什么也不做
+			} else if !(((ps.Tokens.previous().TType == TokenTypeFunction) && (ps.Tokens.previous().TSubType == TokenSubTypeStop)) || ((ps.Tokens.previous().TType == TokenTypeSubexpression) && (ps.Tokens.previous().TSubType == TokenSubTypeStop)) || (ps.Tokens.previous().TType == TokenTypeOperand)) { //
 			} else if !(((ps.Tokens.next().TType == TokenTypeFunction) && (ps.Tokens.next().TSubType == TokenSubTypeStart)) || ((ps.Tokens.next().TType == TokenTypeSubexpression) && (ps.Tokens.next().TSubType == TokenSubTypeStart)) || (ps.Tokens.next().TType == TokenTypeOperand)) {
 			} else {
 				tokens2.add(token.TValue, TokenTypeOperatorInfix, TokenSubTypeIntersection)
@@ -537,52 +552,59 @@ func (ps *Parser) getTokens(formula string) Tokens {
 	// subtypes, pull "@" from in front of function names
 	for tokens2.moveNext() {
 		token := tokens2.current()
+		// 如果类型为中缀, 并且值为"-"
 		if (token.TType == TokenTypeOperatorInfix) && (token.TValue == "-") {
-			if tokens2.BOF() {
-				token.TType = TokenTypeOperatorPrefix
-			} else if ((tokens2.previous().TType == TokenTypeFunction) && (tokens2.previous().TSubType == TokenSubTypeStop)) || ((tokens2.previous().TType == TokenTypeSubexpression) && (tokens2.previous().TSubType == TokenSubTypeStop)) || (tokens2.previous().TType == TokenTypeOperatorPostfix) || (tokens2.previous().TType == TokenTypeOperand) {
-				token.TSubType = TokenSubTypeMath
+			if tokens2.BOF() { //如果是堆栈开始位置
+				token.TType = TokenTypeOperatorPrefix // 将中缀类型变更为前缀
+			} else if ((tokens2.previous().TType == TokenTypeFunction) && (tokens2.previous().TSubType == TokenSubTypeStop)) || ((tokens2.previous().TType == TokenTypeSubexpression) && (tokens2.previous().TSubType == TokenSubTypeStop)) || (tokens2.previous().TType == TokenTypeOperatorPostfix) || (tokens2.previous().TType == TokenTypeOperand) { // 取前一个标记,如果标记类型为函数且子类型为结束符,或者 标记类型为子标记且子类型为结束符, 或者 标记类型为操作数后缀
+				token.TSubType = TokenSubTypeMath // 变更子类型为数学操作符
 			} else {
-				token.TType = TokenTypeOperatorPrefix
+				token.TType = TokenTypeOperatorPrefix // 将中缀类型变更为前缀
 			}
 			continue
 		}
 
+		// 如果类型为中缀, 并且值为"+"
 		if (token.TType == TokenTypeOperatorInfix) && (token.TValue == "+") {
-			if tokens2.BOF() {
-				token.TType = TokenTypeNoop
-			} else if (tokens2.previous().TType == TokenTypeFunction) && (tokens2.previous().TSubType == TokenSubTypeStop) || ((tokens2.previous().TType == TokenTypeSubexpression) && (tokens2.previous().TSubType == TokenSubTypeStop) || (tokens2.previous().TType == TokenTypeOperatorPostfix) || (tokens2.previous().TType == TokenTypeOperand)) {
-				token.TSubType = TokenSubTypeMath
+			if tokens2.BOF() { //如果是堆栈开始位置
+				token.TType = TokenTypeNoop // 将中缀类型变更为无
+			} else if (tokens2.previous().TType == TokenTypeFunction) && (tokens2.previous().TSubType == TokenSubTypeStop) || ((tokens2.previous().TType == TokenTypeSubexpression) && (tokens2.previous().TSubType == TokenSubTypeStop) || (tokens2.previous().TType == TokenTypeOperatorPostfix) || (tokens2.previous().TType == TokenTypeOperand)) { // 取前一个标记,如果标记类型为函数且子类型为结束符,或者 标记类型为子标记且子类型为结束符, 或者 标记类型为操作数后缀，或者 标记类型为操作数
+				token.TSubType = TokenSubTypeMath // 变更子类型为数学操作符
 			} else {
-				token.TType = TokenTypeNoop
+				token.TType = TokenTypeNoop // 将中缀类型变更为无
 			}
 			continue
 		}
 
+		// 如果类型为中缀,且没有子类型
 		if (token.TType == TokenTypeOperatorInfix) && (len(token.TSubType) == 0) {
+			// 如果第一个字符包含<、>或=
 			if strings.ContainsAny(token.TValue[0:1], "<>=") {
-				token.TSubType = TokenSubTypeLogical
-			} else if token.TValue == "&" {
-				token.TSubType = TokenSubTypeConcatenation
-			} else {
-				token.TSubType = TokenSubTypeMath
+				token.TSubType = TokenSubTypeLogical //子类型为逻辑操作符
+			} else if token.TValue == "&" { //如果值为"&"
+				token.TSubType = TokenSubTypeConcatenation //子类型为连接符
+			} else { //否则
+				token.TSubType = TokenSubTypeMath //为数学运算符
 			}
 			continue
 		}
 
+		// 如果类型为操作数,且子类型的长度为0
 		if (token.TType == TokenTypeOperand) && (len(token.TSubType) == 0) {
+			// 如果值不可转变为数值
 			if _, err := strconv.ParseFloat(token.TValue, 64); err != nil {
-				if (token.TValue == "TRUE") || (token.TValue == "FALSE") {
-					token.TSubType = TokenSubTypeLogical
+				if (token.TValue == "TRUE") || (token.TValue == "FALSE") { // 再判断是是否为TRUE或者FALSE
+					token.TSubType = TokenSubTypeLogical //如果是,则子类型为逻辑操作数
 				} else {
-					token.TSubType = TokenSubTypeRange
+					token.TSubType = TokenSubTypeRange //子类型为范围
 				}
 			} else {
-				token.TSubType = TokenSubTypeNumber
+				token.TSubType = TokenSubTypeNumber //子类型为数值
 			}
 			continue
 		}
 
+		// 为函数时,去掉函数前面的@字符
 		if token.TType == TokenTypeFunction {
 			if (len(token.TValue) > 0) && token.TValue[0:1] == "@" {
 				token.TValue = token.TValue[1:]
@@ -591,12 +613,12 @@ func (ps *Parser) getTokens(formula string) Tokens {
 		}
 	}
 
-	tokens2.reset()
+	tokens2.reset() //重置堆栈的索引
 
 	// move all tokens to a new collection, excluding all noops
 	tokens := fTokens()
 	for tokens2.moveNext() {
-		if tokens2.current().TType != TokenTypeNoop {
+		if tokens2.current().TType != TokenTypeNoop { // 保存非空的标记
 			tokens.addRef(Token{
 				TValue:   tokens2.current().TValue,
 				TType:    tokens2.current().TType,
